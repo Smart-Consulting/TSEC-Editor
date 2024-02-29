@@ -6,11 +6,8 @@ import mysql.connector
 
 app = Flask(__name__)
 
-
-
 @app.route('/')
 def index():
-    # Page d'accueil qui affiche les tables disponibles et permet de sélectionner une pour l'éditer
     return render_template('index.html') 
 
 @app.route('/get-tables', methods=['GET'])
@@ -47,7 +44,7 @@ def get_table_data(table_name):
         connexion.close()
 
 @app.route('/tables/<table_name>', methods=['POST'])
-def add_data(table_name):
+def add_table_data(table_name):
     connection = None
     cursor = None
     try:
@@ -71,12 +68,29 @@ def add_data(table_name):
         if connection:
             connection.close()
 
+
+@app.route('/tables/<table_name>/<int:data_id>', methods=['GET'])
+def get_data(table_name, data_id):
+    connexion = get_db_connection()
+    cursor = connexion.cursor(dictionary=True)
+    try:
+        query = f"SELECT * FROM `{table_name}` WHERE TSECID = {data_id}"
+        cursor.execute(query)
+        data = cursor.fetchone()  
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        cursor.close()
+        connexion.close()
+
+
 @app.route('/tables/<table_name>/<int:data_id>', methods=['PUT'])
 def update_data(table_name, data_id):
     try:
         data = request.json
         updates = ', '.join([f"{key} = '{value}'" for key, value in data.items()])
-        query = f"UPDATE `{table_name}` SET {updates} WHERE id = {data_id}"
+        query = f"UPDATE `{table_name}` SET {updates} WHERE TSECID = {data_id}"
         
         connection = get_db_connection()
         cursor = connection.cursor()
@@ -93,7 +107,7 @@ def update_data(table_name, data_id):
 @app.route('/tables/<table_name>/<int:data_id>', methods=['DELETE'])
 def delete_data(table_name, data_id):
     try:
-        query = f"DELETE FROM `{table_name}` WHERE id = {data_id}"
+        query = f"DELETE FROM `{table_name}` WHERE TSECID = {data_id}"
         
         connection = get_db_connection()
         cursor = connection.cursor()
@@ -123,3 +137,4 @@ def get_table_columns(table_name):
     finally:
         cursor.close()
         connexion.close()
+
