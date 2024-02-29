@@ -3,10 +3,10 @@ import mysql.connector
 # Paramètres de connexion à la base de données
 db_config = {
     'host': "localhost",
-    'user': "root",
-    'password': "root",
-    'database': "TSEC_db",
-    'port': 8889
+    'user': "user",
+    'password': "password",
+    'database': "db",
+    'port': "port"
 }
 
 # Fonction pour obtenir la connexion à la base de données
