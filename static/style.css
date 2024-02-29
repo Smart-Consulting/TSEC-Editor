@@ -1,0 +1,26 @@
+#sidebar {
+    float: left;
+    width: 200px;
+    background-color: #f0f0f0;
+    height: 100vh;
+    overflow: auto;
+}
+#main-content {
+    margin-left: 210px;
+    padding: 20px;
+}
+.table-name {
+    padding: 10px;
+    cursor: pointer;
+}
+.table-name:hover {
+    background-color: #dcdcdc;
+}
+
+.option {
+    cursor: pointer; 
+}
+
+.option:hover {
+    text-decoration: underline; 
+}
