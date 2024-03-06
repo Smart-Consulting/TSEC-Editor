@@ -2,7 +2,7 @@ import mysql.connector
 
 # Paramètres de connexion à la base de données
 db_config = {
-    'host': "localhost",
+    'host': "host",
     'user': "user",
     'password': "password",
     'database': "db",

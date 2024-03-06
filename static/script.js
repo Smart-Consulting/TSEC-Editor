@@ -6,33 +6,49 @@ $(document).ready(function() {
         $.ajax({
             url: '/get-tables',
             method: 'GET',
-            success: function(tables) {
+            success: function(allTables) {
+                var tableOrder = [
+                    'TSECINFO',
+                    'QUESTIONS',
+                    'ERRORS',
+                    'SUGGESTS',
+                    'CONTEXTS',
+                    'PASS_CRITERIA',
+                    'INFRPT',
+                    'CARDS',
+                    'TESTCASES'
+                ];
+    
                 var tableList = $('#table-list');
-                tables.forEach(function(table) {
-                    var tableItem = $('<div class="table-item"></div>');
-                    var tableNameElement = $('<div class="table-name" data-table="' + table + '">' + table + '</div>');
-                    var options = $('<div class="options" style="display: none; margin-left: 30px;"></div>');
-                    if (table === 'TSECINFO') {
-                        options.append('<div class="option" data-table="' + table + '" data-option="new-update">New/update</div>');
-                        options.append('<div class="option" data-table="' + table + '" data-option="load">Load</div>');
-                        options.append('<div class="option" data-table="' + table + '" data-option="generate">Generate</div>');
+                tableOrder.forEach(function(tableName) {
+                    if (allTables.includes(tableName)) {
+                        var tableItem = $('<div class="table-item"></div>');
+                        var tableNameElement = $('<div class="table-name" data-table="' + tableName + '">' + tableName + '</div>');
+                        var options = $('<div class="options" style="display: none; margin-left: 30px;"></div>');
+                        if (tableName === 'TSECINFO') {
+                            options.append('<div class="option" data-table="' + tableName + '" data-option="new">New</div>');
+                            options.append('<div class="option" data-table="' + tableName + '" data-option="load-update">Load/Update</div>');
+                            options.append('<div class="option" data-table="' + tableName + '" data-option="generate">Generate</div>');
+                        } else if (tableName === 'QUESTIONS') {
+                            options.append('<div class="option" data-table="' + tableName + '" data-option="new">New</div>');
+                        }
+                        tableItem.append(tableNameElement);
+                        tableItem.append(options);
+                        tableList.append(tableItem);
                     }
-                    tableItem.append(tableNameElement);
-                    tableItem.append(options);
-                    tableList.append(tableItem);
                 });
-
+    
                 $('.table-name').click(function() {
                     var tableName = $(this).data('table');
                     loadTableData(tableName);
                     var options = $(this).siblings('.options');
-                    if (tableName === 'TSECINFO') {
+                    if (tableName === 'TSECINFO' || tableName === 'QUESTIONS') {
                         options.toggle(); 
                     } else {
                         $('.options').hide(); 
                     }
                 });
-
+    
                 $('.option').click(function() {
                     var tableName = $(this).data('table');
                     var option = $(this).data('option');
@@ -41,6 +57,8 @@ $(document).ready(function() {
             }
         });
     }
+    
+    
 
     function loadTableData(tableName) {
         $.ajax({
@@ -69,9 +87,8 @@ $(document).ready(function() {
             }
         });
     }
-    
 
-    function showFormForNewUpdate(tableName) {
+    function showFormForNewTSEC(tableName) {
         if (tableName === 'TSECINFO') {
             // Récupérer les informations sur les colonnes de la table depuis le serveur
             $.ajax({
@@ -85,7 +102,7 @@ $(document).ready(function() {
                     columns.forEach(function(column) {
                         var inputType = 'text'; // Par défaut, le champ est de type texte
                         // Si le champ est auto-incrémenté ou une clé primaire/secondaire, le rendre grisé et pré-rempli
-                        if (column['Extra'] === 'auto_increment' || column['Key'] === 'PRI' || column['Key'] === 'UNI') {
+                        if (column['Extra'] === 'auto_increment' || column['Key'] === 'PRI' || column['Key'] === 'UNI' || column['Key'] === 'MUL') {
                             inputType = 'text'; // Changer le type en texte
                             var input = $('<input type="' + inputType + '" name="' + column['Field'] + '" placeholder="' + column['Field'] + '" required readonly>');
                             // Utiliser le nom de la colonne comme placeholder
@@ -94,11 +111,14 @@ $(document).ready(function() {
                         } else {
                             var input = $('<input type="' + inputType + '" name="' + column['Field'] + '" placeholder="' + column['Field'] + '" required>');
                         }
+                        // Ajouter un saut de ligne avant chaque input
+                        form.append('<br>');
                         // Ajouter l'élément input au formulaire
                         form.append(input);
                     });
     
                     // Ajouter un bouton de soumission
+                    form.append('<br>');
                     form.append('<button type="submit">Enregistrer</button>');
                     // Afficher le formulaire
                     $('#table-data').html(form);
@@ -109,8 +129,9 @@ $(document).ready(function() {
             });
         }
     }
+    
 
-    function handleNewEntryFormSubmission(e) {
+    function handleNewTSECFormSubmission(e) {
         e.preventDefault();
         var formData = {};
         $(this).serializeArray().forEach(function(item) {
@@ -188,7 +209,7 @@ $(document).ready(function() {
                         input.css('background-color', '#f2f2f2'); // Ajouter un fond gris au champ ID
                     }
                     form.append('<br>'); // Ajouter un retour à la ligne avant chaque label
-                    form.append('<label>' + key + '</label>');
+                    form.append('<label>' + key + '</label> : ');
                     form.append(input);
                 }
                 form.append('<br>'); // Ajouter un retour à la ligne après tous les champs
@@ -202,11 +223,6 @@ $(document).ready(function() {
             }
         });
     }
-    
-    
-    
-    
-    
     
     // Fonction pour gérer la soumission du formulaire pour l'édition d'un TSEC
     function handleEditTSECFormSubmission(e) {
@@ -256,6 +272,79 @@ $(document).ready(function() {
         });
     }
 
+    function showFormForNewQuestion() {
+        $.ajax({
+            url: '/table-columns/Questions',
+            method: 'GET',
+            success: function(columns) {
+                // Générer dynamiquement le formulaire en fonction des colonnes
+                var form = $('<form id="newQuestionForm"></form>');
+    
+                // Créer les champs d'entrée du formulaire
+                columns.forEach(function(column) {
+                    var inputType = 'text'; // Par défaut, le champ est de type texte
+                    // Si le champ est auto-incrémenté ou une clé primaire/secondaire, le rendre grisé et pré-rempli
+                    if (column['Extra'] === 'auto_increment' || column['Key'] === 'PRI' || column['Key'] === 'UNI' || column['Key'] === 'MUL')  {
+                        inputType = 'text'; // Changer le type en texte
+                        var input = $('<input type="' + inputType + '" name="' + column['Field'] + '" placeholder="' + column['Field'] + '" required readonly>');
+                        // Utiliser le nom de la colonne comme placeholder
+                        input.val(column['Field']);
+                        input.prop('disabled', true); // Rendre le champ grisé et désactivé
+                    } else {
+                        var input = $('<input type="' + inputType + '" name="' + column['Field'] + '" placeholder="' + column['Field'] + '" required>');
+                    }
+                    // Ajouter un saut de ligne avant chaque input
+                    form.append('<br>');
+                    // Ajouter l'élément input au formulaire
+                    form.append(input);
+                });
+    
+                // Ajouter un bouton de soumission
+                form.append('<br>');
+                form.append('<button type="submit">Enregistrer</button>');
+                // Afficher le formulaire
+                $('#table-data').html(form);
+            },
+            error: function(xhr, status, error) {
+                console.error('Erreur lors de la récupération des colonnes de la table Questions:', error);
+            }
+        });
+    }
+
+    // Fonction pour gérer la soumission du formulaire de création d'une nouvelle question
+    function handleNewQuestionForm(e) {
+        e.preventDefault(); // Empêcher la soumission du formulaire par défaut
+
+        // Récupérer les données du formulaire
+        var formData = {};
+        $(this).serializeArray().forEach(function(item) {
+            formData[item.name] = item.value;
+        });
+
+        // Envoyer une requête AJAX de type POST pour ajouter une nouvelle question
+        $.ajax({
+            url: '/tables/QUESTIONS',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(formData),
+            success: function(response) {
+                console.log('Nouvelle question ajoutée avec succès:', response);
+                // Réinitialiser le formulaire après avoir soumis les données
+                $('#newQuestionForm')[0].reset();
+                // Masquer le formulaire après avoir soumis les données
+                $('#newQuestionForm').hide();
+                // Afficher un message de confirmation
+                alert('Nouvelle question ajoutée avec succès !');
+                // Recharger la liste des questions triées après avoir ajouté une nouvelle question
+                loadSortedQuestions();
+            },
+            error: function(xhr, status, error) {
+                console.error('Erreur lors de l\'ajout de la nouvelle question:', error);
+                // Ajoutez ici la logique pour gérer les erreurs, par exemple, afficher un message d'erreur à l'utilisateur
+            }
+        });
+    }
+
 
 
     // Gérer l'événement de clic sur le bouton "Supprimer"
@@ -267,7 +356,7 @@ $(document).ready(function() {
     });
 
     // Intercepter la soumission du formulaire 
-    $(document).on('submit', '#newEntryForm', handleNewEntryFormSubmission);
+    $(document).on('submit', '#newEntryForm', handleNewTSECFormSubmission);
 
     // Intercepter la soumission du formulaire
     $(document).on('submit', '#editTSECForm', handleEditTSECFormSubmission);
@@ -280,17 +369,24 @@ $(document).ready(function() {
     });
     
     // Gérer l'événement de clic sur l'option "New/Update"
-    $(document).on('click', '.option[data-option="new-update"]', function() {
+    $(document).on('click', '.option[data-option="new"]', function() {
         var tableName = $(this).data('table');
-        showFormForNewUpdate(tableName);
+        showFormForNewTSEC(tableName);
     });
     
     // Gérer l'événement de clic sur l'option "Load"
-    $(document).on('click', '.option[data-option="load"]', function() {
+    $(document).on('click', '.option[data-option="load-update"]', function() {
         var tableName = $(this).data('table');
         loadTSECOptions(tableName);
     });
-    
+
+    $(document).on('click', '.option[data-table="QUESTIONS"][data-option="new"]', function() {
+        showFormForNewQuestion();
+    });
+
+    // Intercepter la soumission du formulaire de création d'une nouvelle question
+    $(document).on('submit', '#newQuestionForm', handleNewQuestionForm);
+
     // Appeler la fonction loadTables pour charger les tables au démarrage de la page
     loadTables();
     

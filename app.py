@@ -18,8 +18,6 @@ def get_tables():
         cursor.execute("SHOW TABLES;")
         tables = cursor.fetchall()
         table_names = [table[0] for table in tables]
-        # Trier la liste des tables et placer TSECINFO en premier
-        table_names.sort(key=lambda x: x != 'TSECINFO')
         return jsonify(table_names)
     except mysql.connector.Error as err:
         print("Something went wrong: {}".format(err))
@@ -124,12 +122,11 @@ def delete_data(table_name, data_id):
 @app.route('/table-columns/<table_name>', methods=['GET'])
 def get_table_columns(table_name):
     try:
-        # Récupérer les informations sur les colonnes de la table depuis la base de données
         connexion = get_db_connection()
         cursor = connexion.cursor(dictionary=True)
         query = f"DESCRIBE `{table_name}`"
         cursor.execute(query)
-        columns = cursor.fetchall()  # Récupérer toutes les colonnes avec leurs propriétés
+        columns = cursor.fetchall()  
         return jsonify(columns)
     except mysql.connector.Error as err:
         print("Something went wrong: {}".format(err))
