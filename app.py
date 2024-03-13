@@ -72,7 +72,7 @@ def get_data(table_name, data_id):
     connexion = get_db_connection()
     cursor = connexion.cursor(dictionary=True)
     try:
-        query = f"SELECT * FROM `{table_name}` WHERE TSECID = {data_id}"
+        query = f"SELECT * FROM `{table_name}` WHERE id = {data_id}"
         cursor.execute(query)
         data = cursor.fetchone()  
         return jsonify(data)

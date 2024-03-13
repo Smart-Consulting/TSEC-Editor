@@ -150,7 +150,7 @@ $(document).ready(function() {
                 var select = $('<select id="tsec-options"></select>');
                 select.append($('<option selected disabled hidden></option>').text('Choisissez un TSEC'));
                 data.forEach(function(row) {
-                    var optionText = row['TSECID'] + ' : ' + row['Name'];
+                    var optionText = row['id'] + ' : ' + row['Name'];
                     select.append($('<option></option>').attr('value', row['TSECID']).text(optionText));
                 });
                 var useButton = $('<button>Utiliser</button>').click(function() {
@@ -255,7 +255,8 @@ $(document).ready(function() {
                 var selectGroup = $('<select id="groupSelect" name="GroupQIDRef" required></select>');
                 selectGroup.append('<option value="">Sélectionnez un groupe</option>');
                 groups.forEach(function(group) {
-                    selectGroup.append($('<option></option>').attr('value', group.GroupQID).text(group.GroupNb));
+                    // Afficher "id: GroupNb" dans le dropdown
+                    selectGroup.append($('<option></option>').attr('value', group.id).text(group.id + ' : ' + group.GroupNb));
                 });
                 var createGroupButton = $('<button type="button" id="createNewGroup">Nouveau</button>');
                 var editGroupButton = $('<button type="button" id="editGroupButton">Modifier</button>');
@@ -278,7 +279,7 @@ $(document).ready(function() {
                                 });
                                 form.append(tsecIdRefInput);
                                 form.append('<br>');
-                            } else if (!['GroupQID', 'Extra', 'Key', 'TSECIDRef'].includes(column.Field)) {
+                            } else if (!['id', 'Extra', 'Key', 'TSECIDRef'].includes(column.Field)) {
                                 var input = $('<input>').attr({
                                     type: 'text',
                                     name: column.Field,
@@ -300,79 +301,17 @@ $(document).ready(function() {
         });
     }
 
-
-    // Afficher le formulaire pour créer un nouveau groupe
-    function showCreateGroupForm() {
-        var form = $('#createGroupForm');
-    
-        // Vérifier si le formulaire existe déjà
-        if (form.length === 0) {
-            // Le formulaire n'existe pas, donc nous le créons et l'affichons
-            $.ajax({
-                url: '/table-columns/GROUP_QUESTIONS',
-                method: 'GET',
-                success: function(columns) {
-                    form = $('<form id="createGroupForm"></form>');
-    
-                    // Parcourir les colonnes récupérées pour créer les champs de formulaire
-                    columns.forEach(function(column) {
-                        // Ignorer les colonnes qui ne sont pas nécessaires dans le formulaire
-                        if (!['GroupQID', 'Extra', 'Key'].includes(column.Field)) {
-                            var input = $('<input>').attr({
-                                type: 'text',
-                                id: 'newGroup' + column.Field,
-                                name: column.Field,
-                                placeholder: column.Field,
-                                required: true
-                            });
-                            form.append(input);
-                            form.append('<br>');
-                        }
-                    });
-    
-                    // Trouver le champ TSECIDRef existant dans le formulaire
-                    var tsecIdRefInput = form.find('input[name="TSECIDRef"]');
-                    if (tsecIdRefInput.length > 0) {
-                        // Si le champ existe, pré-remplir avec la valeur de TSECID sélectionnée
-                        tsecIdRefInput.val(currentTSECID);
-                        tsecIdRefInput.prop('readonly', true);
-                    } else {
-                        // Si le champ n'existe pas, affichez un message d'erreur ou gérez-le comme vous le souhaitez
-                        console.error('Le champ TSECIDRef n\'a pas été trouvé dans le formulaire.');
-                    }
-    
-                    // Ajouter le bouton de soumission pour le formulaire de création de groupe
-                    form.append('<br>');
-                    form.append('<button type="submit">Créer le groupe</button>');
-    
-                    $('#table-data').append(form);
-                    // Afficher le formulaire
-                    form.show();
-    
-                    // Mettre à jour le texte du bouton
-                    var buttonText = form.is(":visible") ? "Fermer le formulaire" : "Nouveau";
-                    $('#createNewGroup').text(buttonText);
-                },
-                error: function(xhr, status, error) {
-                    console.error('Erreur lors du chargement des colonnes de la table GROUP_QUESTIONS :', error);
-                }
-            });
-        } else {
-            // Le formulaire existe déjà, nous le cachons et mettons à jour le texte du bouton
-            form.toggle();
-            var buttonText = form.is(":visible") ? "Fermer le formulaire" : "Nouveau";
-            $('#createNewGroup').text(buttonText);
-        }
-    }
-    
-    
-
     // Gérer la soumission du formulaire pour une nouvelle question
     function handleNewQuestionForm(e) {
         e.preventDefault();
         var formData = {};
+        // Récupérer seulement l'ID du groupe sélectionné
+        formData['GroupQIDRef'] = $('#groupSelect').val();
+        // Collecter les autres données du formulaire
         $(this).serializeArray().forEach(function(item) {
-            formData[item.name] = item.value;
+            if (item.name !== 'GroupQIDRef') {
+                formData[item.name] = item.value;
+            }
         });
         $.ajax({
             url: '/tables/QUESTIONS',
@@ -391,10 +330,120 @@ $(document).ready(function() {
         });
     }
 
+
+    // Afficher le formulaire pour créer un nouveau groupe
+    function showCreateGroupForm() {
+        var form = $('#createGroupForm');
+
+        // Vérifier si le formulaire existe déjà
+        if (form.length === 0) {
+            // Le formulaire n'existe pas, donc nous le créons et l'affichons
+            $.ajax({
+                url: '/table-columns/GROUP_QUESTIONS',
+                method: 'GET',
+                success: function(columns) {
+                    form = $('<form id="createGroupForm"></form>');
+
+                    // Parcourir les colonnes récupérées pour créer les champs de formulaire
+                    columns.forEach(function(column) {
+                        // Ignorer les colonnes qui ne sont pas nécessaires dans le formulaire
+                        if (!['id', 'Extra', 'Key'].includes(column.Field)) {
+                            var input = $('<input>').attr({
+                                type: 'text',
+                                id: 'newGroup' + column.Field,
+                                name: column.Field,
+                                placeholder: column.Field
+                            });
+                            // Vérifier si le champ est nullable
+                            if (column.Null === 'YES') {
+                                input.prop('required', false); // Rendre le champ non obligatoire
+                            } else {
+                                input.prop('required', true); // Rendre le champ obligatoire
+                            }
+                            form.append(input);
+                            form.append('<br>');
+                        }
+                    });
+
+                    // Trouver le champ TSECIDRef existant dans le formulaire
+                    var tsecIdRefInput = form.find('input[name="TSECIDRef"]');
+                    if (tsecIdRefInput.length > 0) {
+                        // Si le champ existe, pré-remplir avec la valeur de TSECID sélectionnée
+                        tsecIdRefInput.val(currentTSECID);
+                        tsecIdRefInput.prop('readonly', true);
+                    } else {
+                        // Si le champ n'existe pas, affichez un message d'erreur ou gérez-le comme vous le souhaitez
+                        console.error('Le champ TSECIDRef n\'a pas été trouvé dans le formulaire.');
+                    }
+
+                    // Ajouter le bouton de soumission pour le formulaire de création de groupe
+                    form.append('<br>');
+                    form.append('<button type="button" id="submitCreateGroup">Créer le groupe</button>');
+
+                    $('#table-data').append(form);
+                    // Afficher le formulaire
+                    form.show();
+
+                    // Mettre à jour le texte du bouton
+                    var buttonText = form.is(":visible") ? "Fermer le formulaire" : "Nouveau";
+                    $('#createNewGroup').text(buttonText);
+
+                    // Écouter l'événement de clic sur le bouton de soumission
+                    $('#submitCreateGroup').on('click', function() {
+                        createNewGroup();
+                    });
+                },
+                error: function(xhr, status, error) {
+                    console.error('Erreur lors du chargement des colonnes de la table GROUP_QUESTIONS :', error);
+                }
+            });
+        } else {
+            // Le formulaire existe déjà, nous le cachons et mettons à jour le texte du bouton
+            form.toggle();
+            var buttonText = form.is(":visible") ? "Fermer le formulaire" : "Nouveau";
+            $('#createNewGroup').text(buttonText);
+        }
+    }
+
+    // Fonction pour créer un nouveau groupe
+    function createNewGroup() {
+        var formData = {};
+        // Collecter les données du formulaire
+        $('#createGroupForm input').each(function() {
+            // Vérifier si le champ est TSECIDRef
+            if ($(this).attr('name') === 'TSECIDRef') {
+                // Récupérer seulement l'ID du TSEC
+                formData['TSECIDRef'] = $(this).val().split(' ')[0];
+            } else {
+                formData[$(this).attr('name')] = $(this).val();
+            }
+        });
+        // Effectuer une requête POST pour créer un nouveau groupe
+        $.ajax({
+            url: '/tables/GROUP_QUESTIONS',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify(formData),
+            success: function(response) {
+                console.log('Nouveau groupe créé avec succès:', response);
+                // Réinitialiser le formulaire après la création du groupe
+                $('#createGroupForm')[0].reset();
+                // Afficher un message de succès à l'utilisateur
+                alert('Nouveau groupe créé avec succès !');
+            },
+            error: function(xhr, status, error) {
+                console.error('Erreur lors de la création du nouveau groupe:', error);
+                // Gérer l'erreur et afficher un message à l'utilisateur si nécessaire
+            }
+        });
+    }
+
+
+    // Gérer l'événement de clic sur le bouton "Modifier"
     function editGroup() {
         // Récupérer l'identifiant du groupe sélectionné dans le menu déroulant
         var selectedGroupID = $('#groupSelect').val();
-    
+
         // Vérifier si un groupe a été sélectionné
         if (selectedGroupID) {
             // Récupérer les données du groupe à partir de l'API ou d'une autre source
@@ -403,12 +452,14 @@ $(document).ready(function() {
                 method: 'GET',
                 success: function(group) {
                     // Remplir le formulaire avec les données du groupe à modifier
-                    $('#newGroupGroupName').val(group.GroupName);
-                    $('#newGroupDescription').val(group.Description);
+                    $('#editGroupGroupNb').val(group.GroupNb);
+                    $('#editGroupGroupPrompt').val(group.GroupPrompt);
+                    $('#editGroupGroupHelp').val(group.GroupHelp);
+                    $('#editGroupGroupMode').val(group.GroupMode);
                     // Autres champs du formulaire à remplir avec les données du groupe si nécessaire
-    
+
                     // Afficher le formulaire de modification du groupe
-                    $('#createGroupForm').show();
+                    $('#editGroupForm').show();
                 },
                 error: function(xhr, status, error) {
                     console.error('Erreur lors de la récupération des données du groupe :', error);
@@ -457,4 +508,5 @@ $(document).ready(function() {
     $(document).on('click', '#editGroupButton', editGroup);
 
     loadTables();
+
 });
