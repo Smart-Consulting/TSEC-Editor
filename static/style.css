@@ -24,3 +24,19 @@
 .option:hover {
     text-decoration: underline; 
 }
+
+/* Assurez-vous que les formulaires sont affichés en ligne */
+#newQuestionForm, #createGroupForm {
+    display: inline-block;
+    vertical-align: top;
+}
+
+/* Ajoutez un espace entre les formulaires */
+#newQuestionForm {
+    margin-right: 20px; 
+}
+
+/* Ajustez la position du formulaire de groupe */
+#createGroupForm {
+    margin-top: 30px; /* Ajoutez ou ajustez la marge supérieure négative en conséquence */
+}
