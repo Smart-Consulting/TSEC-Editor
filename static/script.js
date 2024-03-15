@@ -1,4 +1,5 @@
 var currentTSECID = null;
+var currentTSECName = null; 
 
 $(document).ready(function() {
 
@@ -41,6 +42,7 @@ $(document).ready(function() {
                 // Gérer les événements de clic sur les noms de table et les options
                 $('.table-name').click(function() {
                     var tableName = $(this).data('table');
+                    $('#table-data').empty();
                     loadTableData(tableName);
                     var options = $(this).siblings('.options');
                     if (tableName === 'TSECINFO' || tableName === 'QUESTIONS') {
@@ -151,7 +153,12 @@ $(document).ready(function() {
                 select.append($('<option selected disabled hidden></option>').text('Choisissez un TSEC'));
                 data.forEach(function(row) {
                     var optionText = row['id'] + ' : ' + row['Name'];
-                    select.append($('<option></option>').attr('value', row['TSECID']).text(optionText));
+                    var option = $('<option></option>').attr('value', row['id']).text(optionText);
+                    // Vérifier si l'ID du TSEC correspond à l'ID stocké dans la variable globale
+                    if (currentTSECID && row['id'] == currentTSECID) {
+                        option.attr('selected', 'selected');
+                    }
+                    select.append(option);
                 });
                 var useButton = $('<button>Utiliser</button>').click(function() {
                     if (currentTSECID) {
@@ -164,7 +171,9 @@ $(document).ready(function() {
                 $('#table-data').html(select);
                 $('#table-data').append(useButton, editButton);
                 select.change(function() {
-                    currentTSECID = $(this).val();
+                    var selectedOption = $(this).find(':selected');
+                    currentTSECID = selectedOption.val();
+                    currentTSECName = selectedOption.text().split(' : ')[1]; 
                 });
             },
             error: function(xhr, status, error) {
@@ -172,6 +181,8 @@ $(document).ready(function() {
             }
         });
     }
+    
+    
 
     // Fonction générique pour afficher un formulaire d'édition pour un TSEC spécifié
     function showEditFormForTSEC(selectedTSECID) {
@@ -255,7 +266,6 @@ $(document).ready(function() {
                 var selectGroup = $('<select id="groupSelect" name="GroupQIDRef" required></select>');
                 selectGroup.append('<option value="">Sélectionnez un groupe</option>');
                 groups.forEach(function(group) {
-                    // Afficher "id: GroupNb" dans le dropdown
                     selectGroup.append($('<option></option>').attr('value', group.id).text(group.id + ' : ' + group.GroupNb));
                 });
                 var createGroupButton = $('<button type="button" id="createNewGroup">Nouveau</button>');
@@ -271,11 +281,13 @@ $(document).ready(function() {
                     success: function(columns) {
                         columns.forEach(function(column) {
                             if (column.Field === 'TSECIDRef' && currentTSECID) {
+                                // Pré-remplir le champ TSECID avec l'ID et le nom du TSEC sélectionné
                                 var tsecIdRefInput = $('<input>').attr({
                                     type: 'text',
                                     name: 'TSECIDRef',
-                                    value: currentTSECID,
-                                    readonly: true
+                                    value: currentTSECID + ' : ' + currentTSECName, // ID et nom du TSEC
+                                    readonly: true, 
+                                    disabled: true 
                                 });
                                 form.append(tsecIdRefInput);
                                 form.append('<br>');
@@ -284,7 +296,7 @@ $(document).ready(function() {
                                     type: 'text',
                                     name: column.Field,
                                     placeholder: column.Field,
-                                    required: true
+                                    required: column.Null === 'NO' // Rendre le champ requis si le champ n'est pas nullable
                                 });
                                 form.append(input);
                                 form.append('<br>');
@@ -292,6 +304,15 @@ $(document).ready(function() {
                         });
                         form.append('<button type="submit">Ajouter la Question</button>');
                         $('#table-data').html(form);
+
+                        // Gérer l'événement de changement de sélection du groupe
+                        selectGroup.change(function() {
+                            var selectedGroupId = $(this).val(); // Obtenir l'ID du groupe sélectionné
+                            $('input[name="GroupQIDRef"]').val(selectedGroupId); // Mettre à jour la valeur du champ GroupQIDRef
+                        });
+
+                        // Désactiver le champ GroupQIDRef pour qu'il ne soit pas modifiable manuellement
+                        $('input[name="GroupQIDRef"]').prop('disabled', true);
                     }
                 });
             },
@@ -300,16 +321,15 @@ $(document).ready(function() {
             }
         });
     }
-
-    // Gérer la soumission du formulaire pour une nouvelle question
+    
+    // Gérer la soumission du formulaire de nouvelle question
     function handleNewQuestionForm(e) {
         e.preventDefault();
         var formData = {};
-        // Récupérer seulement l'ID du groupe sélectionné
         formData['GroupQIDRef'] = $('#groupSelect').val();
-        // Collecter les autres données du formulaire
+        formData['TSECIDRef'] = currentTSECID;
         $(this).serializeArray().forEach(function(item) {
-            if (item.name !== 'GroupQIDRef') {
+            if (item.name !== 'GroupQIDRef' && item.name !== 'TSECIDRef') {
                 formData[item.name] = item.value;
             }
         });
@@ -329,6 +349,7 @@ $(document).ready(function() {
             }
         });
     }
+    
 
 
     // Afficher le formulaire pour créer un nouveau groupe
@@ -440,37 +461,55 @@ $(document).ready(function() {
 
 
     // Gérer l'événement de clic sur le bouton "Modifier"
-    function editGroup() {
-        // Récupérer l'identifiant du groupe sélectionné dans le menu déroulant
-        var selectedGroupID = $('#groupSelect').val();
-
-        // Vérifier si un groupe a été sélectionné
-        if (selectedGroupID) {
-            // Récupérer les données du groupe à partir de l'API ou d'une autre source
-            $.ajax({
-                url: '/tables/GROUP_QUESTIONS/' + selectedGroupID,
-                method: 'GET',
-                success: function(group) {
-                    // Remplir le formulaire avec les données du groupe à modifier
-                    $('#editGroupGroupNb').val(group.GroupNb);
-                    $('#editGroupGroupPrompt').val(group.GroupPrompt);
-                    $('#editGroupGroupHelp').val(group.GroupHelp);
-                    $('#editGroupGroupMode').val(group.GroupMode);
-                    // Autres champs du formulaire à remplir avec les données du groupe si nécessaire
-
-                    // Afficher le formulaire de modification du groupe
-                    $('#editGroupForm').show();
-                },
-                error: function(xhr, status, error) {
-                    console.error('Erreur lors de la récupération des données du groupe :', error);
-                    // Gérer l'erreur, afficher un message à l'utilisateur, etc.
-                }
-            });
-        } else {
-            // Aucun groupe sélectionné, afficher un message à l'utilisateur ou gérer l'erreur selon les besoins
-            console.log('Aucun groupe sélectionné.');
-        }
+    function showEditGroupForm(groupId) {
+        $.ajax({
+            url: '/tables/GROUP_QUESTIONS/' + groupId,
+            method: 'GET',
+            success: function(groupData) {
+                // Construit le formulaire de modification en utilisant les données du groupe
+                var formHtml = '<form id="editGroupForm">';
+                Object.keys(groupData).forEach(function(key) {
+                    formHtml += '<label for="' + key + '">' + key + ':</label>';
+                    formHtml += '<input type="text" name="' + key + '" value="' + groupData[key] + '"><br>';
+                });
+                formHtml += '<button type="submit">Sauvegarder les modifications</button>';
+                formHtml += '</form>';
+    
+                $('#table-data').html(formHtml); // Affiche le formulaire
+    
+                // Gère la soumission du formulaire
+                $('#editGroupForm').on('submit', function(e) {
+                    e.preventDefault();
+                    var formData = $(this).serializeArray().reduce(function(obj, item) {
+                        obj[item.name] = item.value;
+                        return obj;
+                    }, {});
+                    updateGroupData(groupId, formData); // Envoie les modifications
+                });
+            },
+            error: function(error) {
+                console.error("Erreur lors du chargement des données du groupe : ", error);
+            }
+        });
     }
+    
+    
+    function updateGroupData(groupId, formData) {
+        $.ajax({
+            url: '/tables/GROUP_QUESTIONS/' + groupId,
+            method: 'PUT',
+            contentType: 'application/json',
+            data: JSON.stringify(formData),
+            success: function(response) {
+                alert('Modifications enregistrées avec succès.');
+                // Actions supplémentaires après la mise à jour (par exemple, rafraîchir les données affichées)
+            },
+            error: function(error) {
+                console.error("Erreur lors de la mise à jour des données du groupe : ", error);
+            }
+        });
+    }
+    
 
     // Gérer l'événement de clic sur le bouton "Supprimer"
     $(document).on('click', '#deleteTSECButton', function() {
@@ -490,6 +529,7 @@ $(document).ready(function() {
         var tableName = $(this).data('table');
         showFormForNewTSEC(tableName);
     });
+
     $(document).on('click', '.option[data-option="load-update"]', function() {
         var tableName = $(this).data('table');
         loadTSECOptions(tableName);
@@ -498,14 +538,21 @@ $(document).ready(function() {
     $(document).on('click', '.option[data-table="QUESTIONS"][data-option="new"]', function() {
         showFormForNewQuestion();
     });
-
+    
     $(document).on('submit', '#newQuestionForm', handleNewQuestionForm);
 
     $(document).on('click', '#createNewGroup', function() {
         showCreateGroupForm(); 
     });
 
-    $(document).on('click', '#editGroupButton', editGroup);
+    $(document).on('click', '#editGroupButton', function() {
+        var groupId = $('#groupSelect').val(); 
+        if (groupId) {
+            showEditGroupForm(groupId); 
+        } else {
+            alert("Veuillez sélectionner un groupe à modifier.");
+        }
+    });    
 
     loadTables();
 

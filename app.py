@@ -88,7 +88,7 @@ def update_data(table_name, data_id):
     try:
         data = request.json
         updates = ', '.join([f"{key} = '{value}'" for key, value in data.items()])
-        query = f"UPDATE `{table_name}` SET {updates} WHERE TSECID = {data_id}"
+        query = f"UPDATE `{table_name}` SET {updates} WHERE id = {data_id}"
         
         connection = get_db_connection()
         cursor = connection.cursor()
@@ -105,7 +105,7 @@ def update_data(table_name, data_id):
 @app.route('/tables/<table_name>/<int:data_id>', methods=['DELETE'])
 def delete_data(table_name, data_id):
     try:
-        query = f"DELETE FROM `{table_name}` WHERE TSECID = {data_id}"
+        query = f"DELETE FROM `{table_name}` WHERE id = {data_id}"
         
         connection = get_db_connection()
         cursor = connection.cursor()
