@@ -1,8 +1,14 @@
 var currentTSECID = null;
 var currentTSECName = null; 
+var currentQuestionID = null
 
 $(document).ready(function() {
 
+    function escapeSpecialCharacters(text) {
+        // Remplace les apostrophes par des caractères d'échappement
+        return text.replace(/'/g, "\\'");
+    }
+    
     // Fonction générique pour charger les tables
     function loadTables() {
         $.ajax({
@@ -26,13 +32,10 @@ $(document).ready(function() {
                         var tableItem = $('<div class="table-item"></div>');
                         var tableNameElement = $('<div class="table-name" data-table="' + tableName + '">' + tableName + '</div>');
                         var options = $('<div class="options" style="display: none; margin-left: 30px;"></div>');
-                        if (tableName === 'TSECINFO') {
+                        if (tableName === 'TSECINFO' || tableName === 'QUESTIONS') {
                             options.append('<div class="option" data-table="' + tableName + '" data-option="new">New</div>');
                             options.append('<div class="option" data-table="' + tableName + '" data-option="load-update">Load/Update</div>');
-                            options.append('<div class="option" data-table="' + tableName + '" data-option="generate">Generate</div>');
-                        } else if (tableName === 'QUESTIONS') {
-                            options.append('<div class="option" data-table="' + tableName + '" data-option="new">New</div>');
-                        }
+                        } 
                         tableItem.append(tableNameElement);
                         tableItem.append(options);
                         tableList.append(tableItem);
@@ -150,18 +153,22 @@ $(document).ready(function() {
             method: 'GET',
             success: function(data) {
                 var select = $('<select id="tsec-options"></select>');
-                select.append($('<option selected disabled hidden></option>').text('Choisissez un TSEC'));
+                select.append($('<option disabled></option>').text('Choisissez un TSEC'));
                 data.forEach(function(row) {
                     var optionText = row['id'] + ' : ' + row['Name'];
                     var option = $('<option></option>').attr('value', row['id']).text(optionText);
-                    // Vérifier si l'ID du TSEC correspond à l'ID stocké dans la variable globale
-                    if (currentTSECID && row['id'] == currentTSECID) {
-                        option.attr('selected', 'selected');
-                    }
                     select.append(option);
                 });
                 var useButton = $('<button>Utiliser</button>').click(function() {
+                    var selectedOption = $('#tsec-options').find(':selected');
+                    currentTSECID = selectedOption.val();
+                    currentTSECName = selectedOption.text().split(' : ')[1];
                     if (currentTSECID) {
+                        // Stocker l'ID du TSEC sélectionné dans le stockage local du navigateur
+                        localStorage.setItem('selectedTSECID', currentTSECID);
+                        localStorage.setItem('selectedTSECName', currentTSECName);
+                        // Mettre à jour le champ TSECIDRef seulement lorsque le bouton "Utiliser" est cliqué
+                        $('input[name="TSECIDRef"]').val(currentTSECID + ' : ' + currentTSECName);
                         alert('TSEC ' + currentTSECID + ' sélectionné pour utilisation.');
                     }
                 });
@@ -170,18 +177,25 @@ $(document).ready(function() {
                 });
                 $('#table-data').html(select);
                 $('#table-data').append(useButton, editButton);
-                select.change(function() {
-                    var selectedOption = $(this).find(':selected');
-                    currentTSECID = selectedOption.val();
-                    currentTSECName = selectedOption.text().split(' : ')[1]; 
-                });
+
+                // Vérifier s'il existe un TSEC sélectionné précédemment dans le stockage local et le sélectionner automatiquement
+                var selectedTSECID = localStorage.getItem('selectedTSECID');
+                if (!selectedTSECID) {
+                    $('#tsec-options').val('Choisissez un TSEC');
+                } else {
+                    $('#tsec-options').val(selectedTSECID);
+                    currentTSECID = selectedTSECID;
+                    currentTSECName = localStorage.getItem('selectedTSECName');
+                    $('input[name="TSECIDRef"]').val(currentTSECID + ' : ' + currentTSECName);
+                }
             },
             error: function(xhr, status, error) {
                 console.error('Erreur lors du chargement des options TSEC:', error);
             }
+            
         });
     }
-    
+
     
 
     // Fonction générique pour afficher un formulaire d'édition pour un TSEC spécifié
@@ -194,12 +208,12 @@ $(document).ready(function() {
                 for (var key in data) {
                     var inputType = 'text';
                     var readonly = '';
-                    if (key === 'TSECID') {
+                    if (key === 'id') {
                         readonly = 'readonly';
                     }
                     var input = $('<input type="' + inputType + '" name="' + key + '" placeholder="' + key + '" required ' + readonly + '>');
                     input.val(data[key]);
-                    if (key === 'TSECID') {
+                    if (key === 'id') {
                         input.css('background-color', '#f2f2f2');
                     }
                     form.append('<br>');
@@ -225,7 +239,7 @@ $(document).ready(function() {
             formData[item.name] = item.value;
         });
         $.ajax({
-            url: '/tables/TSECINFO/' + formData.TSECID,
+            url: '/tables/TSECINFO/' + formData.id,
             method: 'PUT',
             contentType: 'application/json',
             data: JSON.stringify(formData),
@@ -281,13 +295,12 @@ $(document).ready(function() {
                     success: function(columns) {
                         columns.forEach(function(column) {
                             if (column.Field === 'TSECIDRef' && currentTSECID) {
-                                // Pré-remplir le champ TSECID avec l'ID et le nom du TSEC sélectionné
                                 var tsecIdRefInput = $('<input>').attr({
                                     type: 'text',
                                     name: 'TSECIDRef',
-                                    value: currentTSECID + ' : ' + currentTSECName, // ID et nom du TSEC
-                                    readonly: true, 
-                                    disabled: true 
+                                    value: currentTSECID + ' : ' + currentTSECName,
+                                    readonly: true,
+                                    disabled: true
                                 });
                                 form.append(tsecIdRefInput);
                                 form.append('<br>');
@@ -296,7 +309,7 @@ $(document).ready(function() {
                                     type: 'text',
                                     name: column.Field,
                                     placeholder: column.Field,
-                                    required: column.Null === 'NO' // Rendre le champ requis si le champ n'est pas nullable
+                                    required: column.Null === 'NO'
                                 });
                                 form.append(input);
                                 form.append('<br>');
@@ -304,14 +317,10 @@ $(document).ready(function() {
                         });
                         form.append('<button type="submit">Ajouter la Question</button>');
                         $('#table-data').html(form);
-
-                        // Gérer l'événement de changement de sélection du groupe
                         selectGroup.change(function() {
-                            var selectedGroupId = $(this).val(); // Obtenir l'ID du groupe sélectionné
-                            $('input[name="GroupQIDRef"]').val(selectedGroupId); // Mettre à jour la valeur du champ GroupQIDRef
+                            var selectedGroupId = $(this).val();
+                            $('input[name="GroupQIDRef"]').val(selectedGroupId);
                         });
-
-                        // Désactiver le champ GroupQIDRef pour qu'il ne soit pas modifiable manuellement
                         $('input[name="GroupQIDRef"]').prop('disabled', true);
                     }
                 });
@@ -321,7 +330,333 @@ $(document).ready(function() {
             }
         });
     }
+
+    function loadQuestionsForUpdateAndEdit() {
+        $.ajax({
+            url: '/tables/QUESTIONS',
+            method: 'GET',
+            success: function(questions) {
+                var questionSelect = $('<select id="questionSelect"></select>').append('<option value="">Sélectionnez une question</option>');
+                questions.forEach(function(question) {
+                    questionSelect.append($('<option></option>').attr('value', question.id).text(question.id + ': ' + question.QuestName));
+                });
     
+                var useButton = $('<button>Utiliser</button>').click(function() {
+                    var selectedQuestionID = $('#questionSelect').val();
+                    if (selectedQuestionID) {
+                        currentQuestionID = selectedQuestionID; // Met à jour currentQuestionID
+                
+                        // Vide ou cache le formulaire d'édition s'il est ouvert
+                        var editFormContainer = $('#editFormContainer');
+                        if(editFormContainer.length) {
+                            editFormContainer.empty();
+                        }
+                
+                        useQuestion(selectedQuestionID); // Utilise la question sélectionnée
+                    }
+                });
+    
+                var editButton = $('<button>Modifier</button>').click(function() {
+                    var selectedQuestionID = $('#questionSelect').val();
+                    if (selectedQuestionID) {
+                        editQuestion(selectedQuestionID); // Appelle la fonction pour éditer la question sélectionnée
+                    }
+                });
+    
+                $('#table-data').html('').append(questionSelect, useButton, editButton);
+    
+                // Prépare la zone pour les détails des contextes et ajouts
+                var contextDetailsDiv = $('<br><br><br><div id="contextDetails"></div><br>'); // Pour afficher les contextes liés
+                $('#table-data').append(contextDetailsDiv);
+                var contextInterfaceDiv = $('<div id="contextInterface"></div>'); // Pour ajouter de nouveaux contextes
+                $('#table-data').append(contextInterfaceDiv);
+                
+            },
+            error: function(xhr, status, error) {
+                console.error('Erreur lors du chargement des questions:', error);
+            }
+        });
+    }
+    
+    function prepareContextAdditionInterface(questionID) {
+        $('#contextInterface').prepend('<h3>Formulaire de création</h3>');
+        var contextSelect = $('<select id="contextSelect"></select>').append('<option value="">Sélectionnez un contexte</option>');
+        $.ajax({
+            url: '/tables/CONTEXTS',
+            method: 'GET',
+            success: function(contexts) {
+                contexts.forEach(function(context) {
+                    contextSelect.append($('<option></option>').attr('value', context.id).text(context.id + ':' + context.ContextNb));
+                });
+            }
+        });
+    
+        var valueSelect = $('<select id="contextValue"></select>').append('<option value="">Choisir...</option>', '<option value="1">True</option>', '<option value="0">False</option>');
+        var addButton = $('<button>Créer</button>').click(function() {
+            var selectedContextID = $('#contextSelect').val();
+            var value = $('#contextValue').val();
+            addContextToQuestion(questionID, selectedContextID, value);
+        });
+    
+        $('#contextInterface').append(contextSelect, valueSelect, addButton); // Ajoute les éléments à l'interface pour l'ajout de contextes
+    }
+    
+    function loadContextsForQuestion(questionID) {
+        $.ajax({
+            url: '/tables/QUEST_CTXT',
+            method: 'GET',
+            success: function(allContextLinks) {
+                var relevantContexts = allContextLinks.filter(link => link.QuestIDRef == questionID);
+                var table = $('<table></table>').append('<tr><th>Contexte ID</th><th>Valeur</th><th>Actions</th></tr>');
+                relevantContexts.forEach(function(contextLink) {
+                    var editButton = $('<button><i class="fa-solid fa-pen-to-square"></i></button>').click(function() {
+                        // Logique pour éditer le contexte
+                        editContext(contextLink.id, contextLink.ContextIDRef, contextLink.Value);
+                    });
+                    var deleteButton = $('<button><i class="fa-solid fa-trash"></i></button>').click(function() {
+                        // Logique pour supprimer le contexte
+                        deleteContext(contextLink.id); 
+                    });
+    
+                    var row = $('<tr></tr>')
+                        .append('<td>' + contextLink.ContextIDRef + '</td>')
+                        .append('<td>' + (contextLink.Value ? 'True' : 'False') + '</td>')
+                        .append($('<td></td>').append(editButton, deleteButton));
+                    table.append(row);
+                });
+    
+                if (relevantContexts.length === 0) {
+                    $('#contextDetails').html('<p>Aucun contexte lié à cette question.</p>');
+                } else {
+                    $('#contextDetails').html(table);  
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Erreur lors du chargement des contextes liés:', error);
+            }
+        });
+    }
+
+    function editQuestion(questionID) {
+        $.ajax({
+            url: '/table-columns/QUESTIONS',
+            method: 'GET',
+            success: function(columns) {
+                var formHtml = '<form id="editQuestionForm">';
+                columns.forEach(function(column) {
+                    if (column.Key === 'PRI' || column.Key === 'MUL') {
+                        formHtml += `<label for="${column.Field}">${column.Field}:</label>` +
+                                    `<input type="text" id="${column.Field}" name="${column.Field}" disabled><br>`;
+
+                    } else {
+                        formHtml += `<label for="${column.Field}">${column.Field}:</label>` +
+                                    `<input type="text" id="${column.Field}" name="${column.Field}"><br>`;
+                    }
+                });
+                formHtml += '<button type="submit">Sauvegarder les modifications</button></form>';
+                $('#table-data').html(formHtml);
+                
+                fillEditFormWithData(questionID, columns); // Passer les colonnes comme paramètre
+            },
+            error: function(xhr, status, error) {
+                console.error('Erreur lors de la récupération des colonnes:', error);
+            }
+        });
+    }
+    
+    function fillEditFormWithData(questionID, columns) {
+        $.ajax({
+            url: '/tables/QUESTIONS/' + questionID,
+            method: 'GET',
+            success: function(question) {
+                columns.forEach(function(column) {
+                    $(`#${column.Field}`).val(question[column.Field]);
+                });
+    
+                $('#editQuestionForm').on('submit', function(e) {
+                    e.preventDefault();
+                    var updatedQuestion = {};
+                    columns.forEach(function(column) {
+                        // Appliquer l'échappement ici directement
+                        var originalValue = $(`#${column.Field}`).val();
+                        var escapedValue = escapeSpecialCharacters(originalValue);
+                        updatedQuestion[column.Field] = escapedValue;
+                    });
+                    updateQuestion(questionID, updatedQuestion);
+                });
+            },
+            error: function(xhr, status, error) {
+                console.error('Erreur lors de la récupération des données de la question:', error);
+            }
+        });
+    }
+    
+    
+    function updateQuestion(questionID, updatedQuestion) {
+        $.ajax({
+            url: '/tables/QUESTIONS/' + questionID,
+            method: 'PUT',
+            contentType: 'application/json',
+            data: JSON.stringify(updatedQuestion),
+            success: function() {
+                alert('Question mise à jour avec succès.');
+                loadQuestionsForUpdateAndEdit(); // Recharge la liste des questions
+            },
+            error: function(xhr, status, error) {
+                console.error('Erreur lors de la mise à jour de la question:', error);
+            }
+        });
+    }
+    
+
+    function editContext(contextLinkID) {
+        // Premièrement, récupérer les métadonnées de la table pour connaître les champs à générer
+        $.ajax({
+            url: '/table-columns/QUEST_CTXT',
+            method: 'GET',
+            success: function(columns) {
+                var editFormTitle = '<h3>Formulaire d\'édition</h3>';
+                var closeButton = '<button type="button" id="closeEditForm">Fermer</button>';
+                var editFormHtml = '<form id="editContextForm">';
+                columns.forEach(function(column) {
+                    // Générer chaque champ du formulaire basé sur les métadonnées
+                    if (column.Field === 'Value') { // Spécifique pour le champ 'Value'
+                        editFormHtml += '<label for="' + column.Field + '">' + column.Field + ':</label>' +
+                                        '<select id="' + column.Field + '" name="' + column.Field + '">' +
+                                        '<option value="1">True</option>' +
+                                        '<option value="0">False</option>' +
+                                        '</select><br>';
+                    } else if (column.Key === 'PRI' || column.Key === 'MUL') {
+                        editFormHtml += '<label for="' + column.Field + '">' + column.Field + ':</label>' +
+                                        '<input type="text" id="' + column.Field + '" name="' + column.Field + '" disabled><br>';
+                    } else {
+                        // Champs modifiables
+                        editFormHtml += '<label for="' + column.Field + '">' + column.Field + ':</label>' +
+                                        '<input type="text" id="' + column.Field + '" name="' + column.Field + '"><br>';
+                    }
+                });
+                editFormHtml += '<button type="submit">Sauvegarder</button><br><br></form>';
+                
+                // Insérer le formulaire dans le DOM
+                var editFormContainer = $('#editFormContainer');
+                if (editFormContainer.length === 0) {
+                    editFormContainer = $('<div id="editFormContainer"></div>');
+                    $('#contextInterface').before(editFormContainer);
+                }
+                editFormContainer.html(editFormTitle + editFormHtml + closeButton);
+                
+                // Remplir les champs du formulaire avec les données existantes
+                fillEditContextFormWithData(contextLinkID);
+                
+                $('#closeEditForm').on('click', function() {
+                    editFormContainer.empty();
+                });
+    
+                // Gérer la soumission du formulaire
+                $('#editContextForm').on('submit', function(e) {
+                    e.preventDefault();
+                    var formData = {
+                        ContextIDRef: $('#ContextIDRef').val(),
+                        Value: $('#Value').val()
+                    };
+                    updateContext(contextLinkID, formData);
+                });
+            },
+            error: function(xhr, status, error) {
+                console.error('Erreur lors de la récupération des métadonnées:', error);
+            }
+        });
+    }
+    
+    function fillEditContextFormWithData(contextLinkID) {
+        $.ajax({
+            url: '/tables/QUEST_CTXT/' + contextLinkID,
+            method: 'GET',
+            success: function(data) {
+                $('#TSECIDRef').val(data.TSECIDRef);
+                $('#id').val(data.id);
+                $('#QuestIDRef').val(data.QuestIDRef);
+                $('#ContextIDRef').val(data.ContextIDRef);
+                $('#Value').val(data.Value.toString()); 
+            },
+            error: function(xhr, status, error) {
+                console.error('Erreur lors de la récupération des données:', error);
+            }
+        });
+    }
+    
+    function updateContext(contextLinkID, updatedData) {
+        $.ajax({
+            url: '/tables/QUEST_CTXT/' + contextLinkID,
+            method: 'PUT',
+            contentType: 'application/json',
+            data: JSON.stringify(updatedData),
+            success: function() {
+                alert('Contexte mis à jour avec succès.');
+                loadContextsForQuestion(currentQuestionID); // Recharge le tableau des contextes
+            },
+            error: function(xhr, status, error) {
+                console.error('Erreur lors de la mise à jour du contexte:', error);
+            }
+        });
+    }
+    
+    
+    
+    function deleteContext(contextID) {
+        if (confirm('Êtes-vous sûr de vouloir supprimer ce contexte ?')) {
+            $.ajax({
+                url: '/tables/QUEST_CTXT/' + contextID,
+                method: 'DELETE',
+                success: function(response) {
+                    alert('Contexte supprimé avec succès.');
+                    loadContextsForQuestion(currentQuestionID); // Recharge le tableau des contextes
+                },
+                error: function(xhr, status, error) {
+                    console.error('Erreur lors de la suppression du contexte:', error);
+                }
+            });
+        }
+    }
+    
+
+    function addContextToQuestion(questionID, contextID, value) {
+        if (!questionID || !contextID || value === undefined) {
+            alert("Tous les champs doivent être remplis pour ajouter un contexte.");
+            return;
+        }
+    
+        $.ajax({
+            url: '/tables/QUEST_CTXT', // URL de votre API pour ajouter des données à la table QUEST_CTXT
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                TSECIDRef: currentTSECID,
+                QuestIDRef: questionID,
+                ContextIDRef: contextID,
+                Value: value
+
+            }),
+            success: function(response) {
+                alert('Contexte ajouté avec succès.');
+                // Actualiser l'affichage des contextes liés à la question
+                loadContextsForQuestion(questionID);
+            },
+            error: function(xhr, status, error) {
+                console.error('Erreur lors de l\'ajout du contexte:', error);
+                alert('Erreur lors de l\'ajout du contexte: ' + error);
+            }
+        });
+    }
+    
+    
+    function useQuestion(selectedQuestionID) {
+        $('#contextInterface').empty(); // Efface les détails des contextes précédents
+        prepareContextAdditionInterface(selectedQuestionID); // Ajoute une interface pour associer des contextes à la question sélectionnée
+        loadContextsForQuestion(selectedQuestionID); // Charge et affiche les contextes déjà associés à la question
+    }
+    
+
     // Gérer la soumission du formulaire de nouvelle question
     function handleNewQuestionForm(e) {
         e.preventDefault();
@@ -350,7 +685,6 @@ $(document).ready(function() {
         });
     }
     
-
 
     // Afficher le formulaire pour créer un nouveau groupe
     function showCreateGroupForm() {
@@ -425,6 +759,7 @@ $(document).ready(function() {
             $('#createNewGroup').text(buttonText);
         }
     }
+    
 
     // Fonction pour créer un nouveau groupe
     function createNewGroup() {
@@ -460,7 +795,7 @@ $(document).ready(function() {
     }
 
 
-    // Gérer l'événement de clic sur le bouton "Modifier"
+    // Fonction pour afficher le formulaire de modification du groupe
     function showEditGroupForm(groupId) {
         $.ajax({
             url: '/tables/GROUP_QUESTIONS/' + groupId,
@@ -473,10 +808,12 @@ $(document).ready(function() {
                     formHtml += '<input type="text" name="' + key + '" value="' + groupData[key] + '"><br>';
                 });
                 formHtml += '<button type="submit">Sauvegarder les modifications</button>';
+                // Ajouter un bouton de suppression avec une confirmation
+                formHtml += '<button type="button" id="deleteGroupButton">Supprimer le groupe</button>';
                 formHtml += '</form>';
-    
+        
                 $('#table-data').html(formHtml); // Affiche le formulaire
-    
+        
                 // Gère la soumission du formulaire
                 $('#editGroupForm').on('submit', function(e) {
                     e.preventDefault();
@@ -486,13 +823,35 @@ $(document).ready(function() {
                     }, {});
                     updateGroupData(groupId, formData); // Envoie les modifications
                 });
+
+                // Gérer l'événement de clic sur le bouton de suppression
+                $('#deleteGroupButton').on('click', function() {
+                    if (confirm("Êtes-vous sûr de vouloir supprimer ce groupe ?")) {
+                        deleteGroup(groupId);
+                    }
+                });
             },
             error: function(error) {
                 console.error("Erreur lors du chargement des données du groupe : ", error);
             }
         });
     }
-    
+
+    // Fonction pour supprimer un groupe
+    function deleteGroup(groupId) {
+        $.ajax({
+            url: '/tables/GROUP_QUESTIONS/' + groupId,
+            method: 'DELETE',
+            success: function(response) {
+                console.log('Groupe supprimé avec succès:', response);
+                alert('Le groupe a été supprimé avec succès !');
+                // Actions supplémentaires après la suppression du groupe (par exemple, rafraîchir les données affichées)
+            },
+            error: function(xhr, status, error) {
+                console.error('Erreur lors de la suppression du groupe:', error);
+            }
+        });
+    }
     
     function updateGroupData(groupId, formData) {
         $.ajax({
@@ -509,6 +868,16 @@ $(document).ready(function() {
             }
         });
     }
+
+    function clearLocalStorage() {
+        localStorage.removeItem('selectedTSECID');
+        localStorage.removeItem('selectedTSECName');
+    }
+    
+    // Gérer l'événement de fermeture de l'application
+    $(window).on('beforeunload', function() {
+        clearLocalStorage();
+    });
     
 
     // Gérer l'événement de clic sur le bouton "Supprimer"
@@ -552,7 +921,11 @@ $(document).ready(function() {
         } else {
             alert("Veuillez sélectionner un groupe à modifier.");
         }
-    });    
+    });
+
+    $(document).on('click', '.option[data-table="QUESTIONS"][data-option="load-update"]', function() {
+        loadQuestionsForUpdateAndEdit(); // Appelle une fonction pour charger et afficher les questions
+    });
 
     loadTables();
 
