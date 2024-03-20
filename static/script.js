@@ -383,7 +383,7 @@ $(document).ready(function() {
         });
     }
     
-    function prepareContextAdditionInterface(questionID) {
+    function prepareContextAdditionInterface(questionID, callback) {
         $('#contextInterface').prepend('<h3>Formulaire de création</h3>');
         var contextSelect = $('<select id="contextSelect"></select>').append('<option value="">Sélectionnez un contexte</option>');
         $.ajax({
@@ -391,12 +391,12 @@ $(document).ready(function() {
             method: 'GET',
             success: function(contexts) {
                 contexts.forEach(function(context) {
-                    // Stocker chaque contexte dans currentContextsData
                     currentContextsData[context.id] = context;
-    
-                    // Ajouter l'option au select
                     contextSelect.append($('<option></option>').attr('value', context.id).text(context.id + ':' + context.ContextNb));
                 });
+                if (callback && typeof callback === 'function') {
+                    callback(); // Exécutez la fonction de rappel après avoir fini de préparer les données
+                }
             }
         });
     
@@ -415,7 +415,7 @@ $(document).ready(function() {
             url: '/tables/QUEST_CTXT',
             method: 'GET',
             success: function(allContextLinks) {
-                var table = $('<table></table>').append('<tr><th>Contexte Name</th><th>Valeur</th><th>Actions</th></tr>');
+                var table = $('<table></table>').append('<tr><th>ContexteName</th><th>Valeur</th><th>Actions</th></tr>');
                 allContextLinks.filter(link => link.QuestIDRef == questionID).forEach(function(contextLink) {
                     var contextData = currentContextsData[contextLink.ContextIDRef];
                     var contextName = contextData ? `${currentQuestionName} ${contextData.Operator} ${contextData.Value}` : 'Inconnu';
@@ -658,9 +658,10 @@ $(document).ready(function() {
     
     
     function useQuestion(selectedQuestionID) {
-        $('#contextInterface').empty(); // Efface les détails des contextes précédents
-        prepareContextAdditionInterface(selectedQuestionID); // Ajoute une interface pour associer des contextes à la question sélectionnée
-        loadContextsForQuestion(selectedQuestionID); // Charge et affiche les contextes déjà associés à la question
+        $('#contextInterface').empty();
+        prepareContextAdditionInterface(selectedQuestionID, function() {
+            loadContextsForQuestion(selectedQuestionID);
+        });
     }
     
 
