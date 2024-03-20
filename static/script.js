@@ -1,6 +1,8 @@
 var currentTSECID = null;
 var currentTSECName = null; 
-var currentQuestionID = null
+var currentQuestionID = null;
+var currentQuestionName = "";
+var currentContextsData = {}; 
 
 $(document).ready(function() {
 
@@ -284,7 +286,7 @@ $(document).ready(function() {
                 });
                 var createGroupButton = $('<button type="button" id="createNewGroup">Nouveau</button>');
                 var editGroupButton = $('<button type="button" id="editGroupButton">Modifier</button>');
-                form.append('<label for="groupSelect">Groupe :</label>');
+                form.append('<label for="groupSelect">Groupe de question : </label>');
                 form.append(selectGroup);
                 form.append(editGroupButton);
                 form.append(createGroupButton);
@@ -344,14 +346,17 @@ $(document).ready(function() {
                 var useButton = $('<button>Utiliser</button>').click(function() {
                     var selectedQuestionID = $('#questionSelect').val();
                     if (selectedQuestionID) {
-                        currentQuestionID = selectedQuestionID; // Met à jour currentQuestionID
-                
-                        // Vide ou cache le formulaire d'édition s'il est ouvert
+                        currentQuestionID = selectedQuestionID; // Déjà existant
+    
+                        // Trouvez le nom de la question sélectionnée
+                        var selectedOption = $("#questionSelect option:selected").text();
+                        currentQuestionName = selectedOption.substring(selectedOption.indexOf(':') + 2); // Extrait le nom de la question
+    
                         var editFormContainer = $('#editFormContainer');
                         if(editFormContainer.length) {
                             editFormContainer.empty();
                         }
-                
+    
                         useQuestion(selectedQuestionID); // Utilise la question sélectionnée
                     }
                 });
@@ -386,6 +391,10 @@ $(document).ready(function() {
             method: 'GET',
             success: function(contexts) {
                 contexts.forEach(function(context) {
+                    // Stocker chaque contexte dans currentContextsData
+                    currentContextsData[context.id] = context;
+    
+                    // Ajouter l'option au select
                     contextSelect.append($('<option></option>').attr('value', context.id).text(context.id + ':' + context.ContextNb));
                 });
             }
@@ -398,7 +407,7 @@ $(document).ready(function() {
             addContextToQuestion(questionID, selectedContextID, value);
         });
     
-        $('#contextInterface').append(contextSelect, valueSelect, addButton); // Ajoute les éléments à l'interface pour l'ajout de contextes
+        $('#contextInterface').append(contextSelect, valueSelect, addButton);
     }
     
     function loadContextsForQuestion(questionID) {
@@ -406,37 +415,35 @@ $(document).ready(function() {
             url: '/tables/QUEST_CTXT',
             method: 'GET',
             success: function(allContextLinks) {
-                var relevantContexts = allContextLinks.filter(link => link.QuestIDRef == questionID);
-                var table = $('<table></table>').append('<tr><th>Contexte ID</th><th>Valeur</th><th>Actions</th></tr>');
-                relevantContexts.forEach(function(contextLink) {
+                var table = $('<table></table>').append('<tr><th>Contexte Name</th><th>Valeur</th><th>Actions</th></tr>');
+                allContextLinks.filter(link => link.QuestIDRef == questionID).forEach(function(contextLink) {
+                    var contextData = currentContextsData[contextLink.ContextIDRef];
+                    var contextName = contextData ? `${currentQuestionName} ${contextData.Operator} ${contextData.Value}` : 'Inconnu';
+    
                     var editButton = $('<button><i class="fa-solid fa-pen-to-square"></i></button>').click(function() {
-                        // Logique pour éditer le contexte
                         editContext(contextLink.id, contextLink.ContextIDRef, contextLink.Value);
                     });
                     var deleteButton = $('<button><i class="fa-solid fa-trash"></i></button>').click(function() {
-                        // Logique pour supprimer le contexte
-                        deleteContext(contextLink.id); 
+                        deleteContext(contextLink.id);
                     });
     
                     var row = $('<tr></tr>')
-                        .append('<td>' + contextLink.ContextIDRef + '</td>')
+                        .append('<td>' + contextName + '</td>')
                         .append('<td>' + (contextLink.Value ? 'True' : 'False') + '</td>')
                         .append($('<td></td>').append(editButton, deleteButton));
+    
                     table.append(row);
                 });
     
-                if (relevantContexts.length === 0) {
-                    $('#contextDetails').html('<p>Aucun contexte lié à cette question.</p>');
-                } else {
-                    $('#contextDetails').html(table);  
-                }
+                $('#contextDetails').html(allContextLinks.length > 0 ? table : '<p>Aucun contexte lié à cette question.</p>');
             },
             error: function(xhr, status, error) {
                 console.error('Erreur lors du chargement des contextes liés:', error);
             }
         });
     }
-
+    
+    
     function editQuestion(questionID) {
         $.ajax({
             url: '/table-columns/QUESTIONS',
@@ -797,46 +804,59 @@ $(document).ready(function() {
 
     // Fonction pour afficher le formulaire de modification du groupe
     function showEditGroupForm(groupId) {
+        // Premièrement, récupérer les métadonnées de la table pour connaître les champs à générer et leur type
         $.ajax({
-            url: '/tables/GROUP_QUESTIONS/' + groupId,
+            url: '/table-columns/GROUP_QUESTIONS',
             method: 'GET',
-            success: function(groupData) {
-                // Construit le formulaire de modification en utilisant les données du groupe
-                var formHtml = '<form id="editGroupForm">';
-                Object.keys(groupData).forEach(function(key) {
-                    formHtml += '<label for="' + key + '">' + key + ':</label>';
-                    formHtml += '<input type="text" name="' + key + '" value="' + groupData[key] + '"><br>';
-                });
-                formHtml += '<button type="submit">Sauvegarder les modifications</button>';
-                // Ajouter un bouton de suppression avec une confirmation
-                formHtml += '<button type="button" id="deleteGroupButton">Supprimer le groupe</button>';
-                formHtml += '</form>';
-        
-                $('#table-data').html(formHtml); // Affiche le formulaire
-        
-                // Gère la soumission du formulaire
-                $('#editGroupForm').on('submit', function(e) {
-                    e.preventDefault();
-                    var formData = $(this).serializeArray().reduce(function(obj, item) {
-                        obj[item.name] = item.value;
-                        return obj;
-                    }, {});
-                    updateGroupData(groupId, formData); // Envoie les modifications
-                });
-
-                // Gérer l'événement de clic sur le bouton de suppression
-                $('#deleteGroupButton').on('click', function() {
-                    if (confirm("Êtes-vous sûr de vouloir supprimer ce groupe ?")) {
-                        deleteGroup(groupId);
+            success: function(columns) {
+                $.ajax({
+                    url: '/tables/GROUP_QUESTIONS/' + groupId,
+                    method: 'GET',
+                    success: function(groupData) {
+                        var formHtml = '<form id="editGroupForm">';
+                        columns.forEach(function(column) {
+                            // Vérifie si le champ est une clé primaire (PRI) ou une clé étrangère (MUL)
+                            var isDisabled = column.Key === 'PRI' || column.Key === 'MUL';
+                            var disabledAttribute = isDisabled ? ' disabled ' : '';
+                            var value = groupData[column.Field] || '';
+    
+                            formHtml += '<label for="' + column.Field + '">' + column.Field + ':</label>' +
+                                        '<input type="text" name="' + column.Field + '" value="' + value + '"' + disabledAttribute + '><br>';
+                        });
+                        formHtml += '<button type="submit">Sauvegarder les modifications</button>';
+                        formHtml += '<button type="button" id="deleteGroupButton">Supprimer le groupe</button>';
+                        formHtml += '</form>';
+    
+                        $('#table-data').html(formHtml); // Affiche le formulaire
+    
+                        // Gérer la soumission du formulaire
+                        $('#editGroupForm').on('submit', function(e) {
+                            e.preventDefault();
+                            var formData = $(this).serializeArray().reduce(function(obj, item) {
+                                obj[item.name] = item.value;
+                                return obj;
+                            }, {});
+                            updateGroupData(groupId, formData); // Envoie les modifications
+                        });
+    
+                        // Gérer l'événement de clic sur le bouton de suppression
+                        $('#deleteGroupButton').on('click', function() {
+                            if (confirm("Êtes-vous sûr de vouloir supprimer ce groupe ?")) {
+                                deleteGroup(groupId);
+                            }
+                        });
+                    },
+                    error: function(error) {
+                        console.error("Erreur lors du chargement des données du groupe : ", error);
                     }
                 });
             },
-            error: function(error) {
-                console.error("Erreur lors du chargement des données du groupe : ", error);
+            error: function(xhr, status, error) {
+                console.error('Erreur lors de la récupération des métadonnées:', error);
             }
         });
     }
-
+    
     // Fonction pour supprimer un groupe
     function deleteGroup(groupId) {
         $.ajax({
