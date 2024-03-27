@@ -3,6 +3,7 @@ var currentTSECName = null;
 var currentQuestionID = null;
 var currentQuestionName = "";
 var currentContextsData = {}; 
+var currentErrorID = null;
 
 $(document).ready(function() {
 
@@ -509,7 +510,7 @@ $(document).ready(function() {
                 });
                 var createGroupButton = $('<button type="button" id="createNewGroup">Nouveau</button>');
                 var editGroupButton = $('<button type="button" id="editGroupButton">Modifier</button>');
-                form.append('<label for="groupSelect">Groupe de question : </label>');
+                form.append('<label for="groupSelect">Groupe de questions : </label>');
                 form.append(selectGroup);
                 form.append(editGroupButton);
                 form.append(createGroupButton);
@@ -565,7 +566,6 @@ $(document).ready(function() {
     }
     
 
-
     function loadQuestionsForUpdateAndEdit() {
         $.ajax({
             url: '/tables/QUESTIONS',
@@ -582,7 +582,7 @@ $(document).ready(function() {
                     if (selectedQuestionID) {
                         currentQuestionID = selectedQuestionID; // Déjà existant
     
-                        // Trouvez le nom de la question sélectionnée
+                        // Trouver le nom de la question sélectionnée
                         var selectedOption = $("#questionSelect option:selected").text();
                         currentQuestionName = selectedOption.substring(selectedOption.indexOf(':') + 2); // Extrait le nom de la question
     
@@ -598,7 +598,7 @@ $(document).ready(function() {
                 var editButton = $('<button>Modifier</button>').click(function() {
                     var selectedQuestionID = $('#questionSelect').val();
                     if (selectedQuestionID) {
-                        editQuestion(selectedQuestionID); // Appelle la fonction pour éditer la question sélectionnée
+                        editQuestion(selectedQuestionID); 
                     }
                 });
     
@@ -625,8 +625,6 @@ $(document).ready(function() {
         });
     }
     
-        
-    
     function prepareContextAdditionInterface(questionID, callback) {
         $('#contextInterface').prepend('<h3>Formulaire de création</h3>');
         var contextSelect = $('<select id="contextSelect"></select>').append('<option value="">Sélectionnez un contexte</option>');
@@ -639,13 +637,13 @@ $(document).ready(function() {
                     contextSelect.append($('<option></option>').attr('value', context.id).text(context.id + ':' + context.ContextNb));
                 });
                 if (callback && typeof callback === 'function') {
-                    callback(); // Exécutez la fonction de rappel après avoir fini de préparer les données
+                    callback(); 
                 }
             }
         });
     
         var valueSelect = $('<select id="contextValue"></select>').append('<option value="">Choisir...</option>', '<option value="1">True</option>', '<option value="0">False</option>');
-        var addButton = $('<button>Créer</button>').click(function() {
+        var addButton = $('<button>Lier le contexte et la question</button>').click(function() {
             var selectedContextID = $('#contextSelect').val();
             var value = $('#contextValue').val();
             addContextToQuestion(questionID, selectedContextID, value);
@@ -816,7 +814,7 @@ $(document).ready(function() {
     function editQuestionContext(contextLinkID) {
         // Premièrement, récupérer les métadonnées de la table pour connaître les champs à générer
         $.ajax({
-            url: '/table-columns/QUEST_CTXT',
+            url: '/table-columns/QUEST_CTXT', 
             method: 'GET',
             success: function(columns) {
                 var editFormTitle = '<h3>Formulaire d\'édition</h3>';
@@ -834,7 +832,6 @@ $(document).ready(function() {
                         editFormHtml += '<label for="' + column.Field + '">' + column.Field + ':</label>' +
                                         '<input type="text" id="' + column.Field + '" name="' + column.Field + '" disabled><br>';
                     } else {
-                        // Champs modifiables
                         editFormHtml += '<label for="' + column.Field + '">' + column.Field + ':</label>' +
                                         '<input type="text" id="' + column.Field + '" name="' + column.Field + '"><br>';
                     }
@@ -856,7 +853,6 @@ $(document).ready(function() {
                     editFormContainer.empty();
                 });
     
-                // Gérer la soumission du formulaire
                 $('#editQuestionContextForm').on('submit', function(e) {
                     e.preventDefault();
                     var formData = {
@@ -897,7 +893,7 @@ $(document).ready(function() {
             data: JSON.stringify(updatedData),
             success: function() {
                 alert('Contexte mis à jour avec succès.');
-                loadContextsForQuestion(currentQuestionID); // Recharge le tableau des contextes
+                loadContextsForQuestion(currentQuestionID); 
             },
             error: function(xhr, status, error) {
                 console.error('Erreur lors de la mise à jour du contexte:', error);
@@ -912,7 +908,7 @@ $(document).ready(function() {
                 method: 'DELETE',
                 success: function(response) {
                     alert('Contexte supprimé avec succès.');
-                    loadContextsForQuestion(currentQuestionID); // Recharge le tableau des contextes
+                    loadContextsForQuestion(currentQuestionID); 
                 },
                 error: function(xhr, status, error) {
                     console.error('Erreur lors de la suppression du contexte:', error);
@@ -1261,24 +1257,41 @@ $(document).ready(function() {
     }
     
     
-    
-    
     function loadErrorsForUpdateAndDelete() {
         $.ajax({
             url: '/tables/ERRORS',
             method: 'GET',
             success: function(errors) {
-                var errorSelect = $('<select id="errorSelect"></select>').append('<option value="">Selectionnez une erreur</option>');
+                var errorSelect = $('<select id="errorSelect"></select>').append('<option value="">Sélectionnez une erreur</option>');
                 errors.forEach(function(error) {
                     errorSelect.append($('<option></option>').attr('value', error.id).text(error.ErrName));
                 });
+    
+                // Bouton Modifier
                 var editButton = $('<button>Modifier</button>').click(function() {
                     var selectedErrorID = $('#errorSelect').val();
                     if (selectedErrorID) {
                         showEditErrorForm(selectedErrorID);
                     }
                 });
-                $('#table-data').html('').append(errorSelect, editButton);
+    
+                // Bouton Utiliser
+                var useButton = $('<button>Utiliser</button>').click(function() {
+                    var selectedErrorID = $('#errorSelect').val();
+                    if (selectedErrorID) {
+                        currentErrorID = selectedErrorID; // Mise à jour de currentErrorID ici
+                        showFormForLinkingErrorToContext(selectedErrorID);
+                        loadContextsForError(selectedErrorID); 
+                    }
+                });
+                    
+                // Ajouter les boutons et le sélecteur d'erreurs à la page
+                $('#table-data').html('').append(errorSelect, editButton, useButton);
+
+                 // Préparer l'interface pour les détails des contextes et les ajouts
+                 var contextDetailsDiv = $('<div id="contextDetailsForError"></div>'); // Pour afficher les contextes liés
+                 var contextInterfaceDiv = $('<div id="contextDetailsForErrorInterface"></div>'); // Pour ajouter de nouveaux contextes
+                 $('#table-data').append(contextDetailsDiv, contextInterfaceDiv);
             },
             error: function(xhr, status, error) {
                 console.error('Error loading errors:', error);
@@ -1286,7 +1299,6 @@ $(document).ready(function() {
         });
     }
     
-
     function submitNewError(formElement) {
         var formData = {};
         $(formElement).serializeArray().forEach(function(item) {
@@ -1296,7 +1308,7 @@ $(document).ready(function() {
         formData['TSECIDRef'] = currentTSECID;
     
         $.ajax({
-            url: '/tables/ERRORS', // Assurez-vous que cette URL est correcte pour votre API
+            url: '/tables/ERRORS', 
             method: 'POST',
             contentType: 'application/json',
             data: JSON.stringify(formData),
@@ -1391,25 +1403,217 @@ $(document).ready(function() {
         });
     }
     
-    
-    // Gérer la suppression d'une erreur
     function handleDeleteError() {
         var errorID = $(this).data('error-id');
         deleteError(errorID);
     }
+
+
+    function linkErrorToContext(errorID, formData) {
+        $.ajax({
+            url: '/tables/ERR_CTXT',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                TSECIDRef: currentTSECID,
+                ErrIDRef: currentErrorID,
+                ContextIDRef: formData.contextID,
+                Value: formData.value
+            }),
+            success: function() {
+                alert('Lien entre l\'erreur et le contexte créé avec succès.');
+                loadContextsForError(errorID);
+            },
+            error: function(xhr, status, error) {
+                console.error('Erreur lors de la création du lien :', error);
+                alert('Échec de la création du lien.');
+            }
+        });
+    }
+
+    function showFormForLinkingErrorToContext(errorID) {
+        var contextInterfaceDiv = $("#contextDetailsForErrorInterface");
+        if (contextInterfaceDiv.length === 0) {
+            contextInterfaceDiv = $('<div id="contextDetailsForErrorInterface"></div>');
+            $('#table-data').append(contextInterfaceDiv); // Ou choisissez où vous voulez l'ajouter spécifiquement
+        }
+        contextInterfaceDiv.empty(); // S'assure que le conteneur est vide avant d'ajouter de nouveaux éléments
+    
+        // Ajoute le titre du formulaire
+        var title = $('<h3>Formulaire de création</h3>');
+        contextInterfaceDiv.append(title);
+    
+        // Crée le formulaire
+        var form = $('<form id="linkErrorToContextForm"></form>');
+        form.attr('data-error-id', errorID); 
+        var contextSelect = $('<select id="contextSelect" name="contextID"></select>').append('<option value="">Sélectionnez un contexte</option>');
+    
+        // Chargement des contextes disponibles
+        $.ajax({
+            url: '/tables/CONTEXTS',
+            method: 'GET',
+            success: function(contexts) {
+                contexts.forEach(function(context) {
+                    contextSelect.append($('<option></option>').attr('value', context.id).text(context.ContextNb));
+                });
+                form.append(contextSelect);
+    
+                var valueSelect = $('<select id="valueSelect" name="value"></select>').append('<option value="true">True</option>', '<option value="false">False</option>');
+                form.append(valueSelect);
+    
+                form.append('<button type="submit">Lier Erreur au Contexte</button>');
+                contextInterfaceDiv.append(form); 
+            }
+        });
+    }
+    
+
+    function loadContextsForError(errorID) {
+        $.ajax({
+            url: '/tables/ERR_CTXT',
+            method: 'GET',
+            success: function(allErrorLinks) {
+                var table = $('<table></table>').append('<tr><th>ContexteName</th><th>Valeur</th><th>Actions</th></tr>');
+                allErrorLinks.filter(link => link.ErrIDRef == errorID).forEach(function(errorLink) {
+                    var contextData = currentContextsData[errorLink.ContextIDRef];
+                    var contextName = contextData ? `${contextData.ContextNb}` : 'Inconnu';
+                    var valueText = errorLink.Value ? 'True' : 'False';
+    
+                    // Assurez-vous de passer correctement errorLinkID à editErrorContext
+                    var editButton = $('<button><i class="fa-solid fa-pen-to-square"></i></button>').click(function() {
+                        editErrorContext(errorLink.id); // Passez ici l'ID du lien ERR_CTXT
+                    });
+                    var deleteButton = $('<button><i class="fa-solid fa-trash"></i></button>').click(function() {
+                        deleteErrorContext(errorLink.id);
+                    });
+    
+                    var row = $('<tr></tr>')
+                        .append('<td>' + contextName + '</td>')
+                        .append('<td>' + valueText + '</td>')
+                        .append($('<td></td>').append(editButton, deleteButton));
+    
+                    table.append(row);
+                });
+    
+                $('#contextDetailsForError').html(allErrorLinks.length > 0 ? table : '<p>Aucun contexte lié à cette erreur.</p>');
+            },
+            error: function(xhr, status, error) {
+                console.error('Erreur lors du chargement des contextes liés à l\'erreur:', error);
+            }
+        });
+    }
+    
+
+    function deleteErrorContext(errorContextID) {
+        if (confirm('Êtes-vous sûr de vouloir supprimer ce contexte lié ?')) {
+            $.ajax({
+                url: '/tables/ERR_CTXT/' + errorContextID, 
+                method: 'DELETE',
+                success: function() {
+                    alert('Lien entre l\'erreur et le contexte supprimé avec succès.');
+                    loadContextsForError(currentErrorID); 
+                },
+                error: function(xhr, status, error) {
+                    console.error('Erreur lors de la suppression du contexte lié:', error);
+                    alert('Échec de la suppression du contexte lié.');
+                }
+            });
+        }
+    }
+
+    function editErrorContext(errorLinkID) {
+        $.ajax({
+            url: '/table-columns/ERR_CTXT',
+            method: 'GET',
+            success: function(columns) {
+                $.ajax({
+                    url: `/tables/ERR_CTXT/${errorLinkID}`,
+                    method: 'GET',
+                    success: function(linkData) {
+                        var formHtml = '<h3>Formulaire d\'édition</h3><form id="editErrorContextForm">';
+                        columns.forEach(column => {
+                            var value = linkData[column.Field];
+                            if (column.Field === 'Value') {
+                                formHtml += `<label for="${column.Field}">${column.Field}:</label><select id="${column.Field}" name="${column.Field}"><option value="true"${value ? " selected" : ""}>True</option><option value="false"${!value ? " selected" : ""}>False</option></select><br>`;
+                            } else {
+                                formHtml += `<label for="${column.Field}">${column.Field}:</label><input type="text" id="${column.Field}" name="${column.Field}" value="${value}" ${column.Key === 'PRI' ? 'readonly' : ''}><br>`;
+                            }
+                        });
+                        formHtml += '<button type="submit">Sauvegarder</button></form>';
+                        formHtml += '<button id="closeEditForm">Fermer</button>';
+    
+                        // S'assure que le conteneur du formulaire est placé correctement
+                        var editFormContainer = $('#editFormContainerErrorContext');
+                        if (editFormContainer.length === 0) {
+                            editFormContainer = $('<div id="editFormContainerErrorContext"></div>');
+                            // Place le conteneur juste après le tableau des contextes liés à l'erreur
+                            $('#contextDetailsForError').after(editFormContainer);
+                        }
+                        editFormContainer.html(formHtml);
+    
+                        $('#editErrorContextForm').on('submit', function(e) {
+                            e.preventDefault();
+                            var formData = $(this).serializeArray().reduce((obj, item) => (obj[item.name] = item.value, obj), {});
+                            updateErrorContext(errorLinkID, formData);
+                        });
+    
+                        $('#closeEditForm').click(function() {
+                            editFormContainer.empty();
+                        });
+                    }
+                });
+            },
+            error: function(xhr, status, error) {
+                console.error('Erreur lors de la récupération des métadonnées:', error);
+            }
+        });
+    }
+    
+    
+    function updateErrorContext(errorLinkID, formData) {
+        formData.Value = formData.Value === "true" ? 1 : 0;
+    
+        $.ajax({
+            url: '/tables/ERR_CTXT/' + errorLinkID, 
+            method: 'PUT',
+            contentType: 'application/json',
+            data: JSON.stringify({
+                ErrIDRef: formData.ErrIDRef,
+                ContextIDRef: formData.ContextIDRef,
+                Value: formData.Value
+            }),
+            success: function() {
+                alert('Lien entre l\'erreur et le contexte mis à jour avec succès.');
+                $('#editFormContainerErrorContext').empty(); 
+                // Remplacer currentErrorID par l'ID correct de l'erreur si nécessaire
+                loadContextsForError(formData.ErrIDRef);
+            },
+            error: function(xhr, status, error) {
+                console.error('Erreur lors de la mise à jour du lien entre l\'erreur et le contexte:', error);
+                alert('Échec de la mise à jour du lien.');
+            }
+        });
+    }
+
+    function handleSubmitLinkErrorToContext() {
+        var errorID = $(this).attr('data-error-id'); // Assurez-vous que l'attribut data-error-id est bien défini sur le formulaire
+        var contextID = $('#contextSelect').val();
+        var value = $('#valueSelect').val() === "true" ? 1 : 0; // Convertit "true" en 1 et "false" en 0
+    
+        linkErrorToContext(errorID, {contextID: contextID, value: value});
+    }
+    
 
     function clearLocalStorage() {
         localStorage.removeItem('selectedTSECID');
         localStorage.removeItem('selectedTSECName');
     }
     
-    // Gérer l'événement de fermeture de l'application
     $(window).on('beforeunload', function() {
         clearLocalStorage();
     });
     
 
-    // Gérer l'événement de clic sur le bouton "Supprimer"
     $(document).on('click', '#deleteTSECButton', function() {
         if (confirm("Êtes-vous sûr de vouloir supprimer ce TSEC ?")) {
             var selectedTSECID = $(this).closest('form').find('input[name="TSECID"]').val();
@@ -1486,6 +1690,12 @@ $(document).ready(function() {
         var contextID = $(this).attr('data-context-id');
         editContext(contextID);
     });
+
+    $(document).on('submit', '#linkErrorToContextForm', function(e) {
+        e.preventDefault(); 
+        handleSubmitLinkErrorToContext.call(this); 
+    });
+    
 
     loadTables();
 
